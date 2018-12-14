@@ -1,0 +1,101 @@
+#!python3
+'''
+This script produces the weekly catch up report based on the downloaded list of tickets from JIRA
+
+NOTE: 
+- The script and the csv file must be in the same folder.
+- The csv file downloaded from JIRA will look like: SD UK_ TKTS and Tasks from last week ... .csv
+- It should be the only csv file
+
+TODO:
+- download csv file from JIRA
+- add sending the report via email
+'''
+
+import csv, sys, openpyxl, datetime, os
+from openpyxl.styles import Border, Side
+
+def get_csv():
+    #TODO: download the file directly from JIRA
+    currentFolder = os.getcwd()
+    for file in os.listdir(currentFolder):
+        if 'SD UK_ TKTS and Tasks from last week' in file:
+            fileToOpen = str(file)
+    returnFile = os.path.join(currentFolder,fileToOpen)
+    return returnFile
+
+
+def read_csv_file(filename):
+    csvFile = open(filename,encoding="utf8")
+    csvReader = csv.reader(csvFile)
+    csvDataList = list(csvReader)
+    return csvDataList
+
+
+def produce_report(reportData):
+    reportDataList=[]
+    for i in range(1,len(reportData)):
+        #extract the summary and resolved fields, skipping the header
+        #Summary: as is
+        #Resolved: take only the date (left 11 characters) and replace dots with slashes to match the date format
+        lineEntry = [reportData[i][0],reportData[i][3][:10].replace('.','/')]
+        reportDataList.append(lineEntry)
+    return reportDataList
+
+  
+def write_Excel_report(reportData):
+    #writes the report Data to the template file
+    TEMPLATE_FILENAME = 'CatchupReportTemplate.xlsx'
+    timeNow = datetime.datetime.now()
+
+    #Assuming the reports runs on Monday calculate the last week
+    deltaMonday= datetime.timedelta(days=7, hours=0, minutes=0, seconds=0)
+    deltaSunday = datetime.timedelta(days=1, hours=0, minutes=0, seconds=0)
+    last_Monday = timeNow - deltaMonday
+    last_Sunday = timeNow - deltaSunday
+    day_start = last_Monday.strftime('%d %B')
+    day_stop = last_Sunday.strftime('%d %B')
+
+    #name should be like 'Weekly Catch up IT(3 December - 9 December).xlsx'
+    OutputFilename = 'Weekly Catch up IT (' + day_start + '-' + day_stop + ')' +'.xlsx'
+    
+    reportFile = openpyxl.load_workbook(TEMPLATE_FILENAME)
+    sheet = reportFile.active
+
+    #add current date to the file
+    sheet['C2'] = timeNow.strftime('%d/%m/%Y')
+
+    count = 1
+    for entry in reportData:
+        lineNumber = count + 4
+        sheet['B' + str(4+count)] = str(count)
+        sheet['C' + str(lineNumber)] = 'Support'
+        sheet['D' + str(lineNumber)] = entry[0]
+        sheet['E' + str(lineNumber)] = 2
+        if entry[1] == '':
+            sheet['F' + str(lineNumber)] = 'In progress'
+        else:
+            sheet['F' + str(lineNumber)] = 'Done'
+        sheet['J' + str(lineNumber)] = entry[1]
+        count = count +1
+
+    #set borders
+    thin_border = Border(left=Side(style='thin'), 
+                     right=Side(style='thin'), 
+                     top=Side(style='thin'), 
+                     bottom=Side(style='thin'))        
+    for i in range(5,count+4):
+        for j in range(2,11):
+            sheet.cell(row=i,column=j).border = thin_border
+    
+    reportFile.save(OutputFilename)
+
+
+
+#body
+
+downloadedFile = get_csv()
+data_from_the_file = read_csv_file(downloadedFile)
+parsed_data = produce_report(data_from_the_file)
+write_Excel_report(parsed_data)
+#TODO: add sending the report via email
