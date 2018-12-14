@@ -4,23 +4,26 @@ This script produces the weekly catch up report based on the downloaded list of 
 
 NOTE: 
 - The script and the csv file must be in the same folder.
-- The csv file downloaded from JIRA will look like: SD UK_ TKTS and Tasks from last week ... .csv
+- The csv file downloaded from JIRA will look like: SD UK_ TKTS and Tasks from last week (JIRA) 2018-12-14T09_09_58+0000.csv
 - It should be the only csv file
+- uses win32com library. To install run: pip install pypiwin32
 
 TODO:
 - download csv file from JIRA
-- add sending the report via email
 '''
 
-import csv, sys, openpyxl, datetime, os
+import csv, sys, openpyxl, datetime, os, send2trash
 from openpyxl.styles import Border, Side
+import win32com.client as win32
 
 def get_csv():
-    #TODO: download the file directly from JIRA
+    #TODO: proper file download
     currentFolder = os.getcwd()
     for file in os.listdir(currentFolder):
         if 'SD UK_ TKTS and Tasks from last week' in file:
             fileToOpen = str(file)
+    if fileToOpen == '':
+        print('No csv file found')
     returnFile = os.path.join(currentFolder,fileToOpen)
     return returnFile
 
@@ -89,13 +92,37 @@ def write_Excel_report(reportData):
             sheet.cell(row=i,column=j).border = thin_border
     
     reportFile.save(OutputFilename)
+    return str(OutputFilename)
 
+def sendReport(FileToSend):
+    REPORTTO = ''
+    CC = ''
+    
+    outlook = win32.Dispatch('outlook.application')
+    mail = outlook.CreateItem(0)
+    mail.To = REPORTTO
+    mail.CC = CC
+    mail.Subject = 'Weekly catch-up report'
+    mail.Body = '''Hi
 
+    Please see the report attached
+
+    Kind regards,
+    IT
+    '''
+    # To attach a file to the email (optional):
+    mail.Attachments.Add(os.path.join(os.getcwd(),FileToSend))
+
+    mail.Display(True)
+    
 
 #body
 
 downloadedFile = get_csv()
 data_from_the_file = read_csv_file(downloadedFile)
 parsed_data = produce_report(data_from_the_file)
-write_Excel_report(parsed_data)
-#TODO: add sending the report via email
+readyReport = write_Excel_report(parsed_data)
+sendReport(readyReport)
+
+send2trash.send2trash(downloadedFile)
+send2trash.send2trash(readyReport)
